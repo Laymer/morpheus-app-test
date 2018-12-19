@@ -13,7 +13,7 @@
 ?MORPHEUS_CB_TO_OVERRIDE(_, _, _) ->
     false.
 
-?MORPHEUS_CB_HANDLE_OVERRIDE(gen_server, NewModule, loop, OrigLoop, Args, _Ann) ->
+?MORPHEUS_CB_HANDLE_OVERRIDE(gen_server, NewModule, loop, NewEntry, Args, _Ann) ->
     %% This is a bit of hacky to extract info from the arguments
     %% The reporting interface in callback is not stable yet ...
     [_, Name, State, Mod | _] = Args,
@@ -23,7 +23,7 @@
             ets:insert(test_state, {self(), State}),
             ToReport = lists:sort(ets:match(test_state, '$1')),
             %% UGLY! ...
-            morpheus_sandbox:call_ctl(morpheus_sandbox:get_ctl(), undefined, {nodelay, {guest_report_state, ToReport}}),
+            morpheus_sandbox:call_ctl(morpheus_sandbox:get_ctl(), undefined, {nodelay, ?cci_guest_report_state(ToReport)}),
             %% io:format(user, "report state ~p~n", [ToReport]),
             ok;
         %% locks_agent seems to have its own loop ...
@@ -31,17 +31,17 @@
         _ -> ok
     end,
     %% forward to the original code
-    apply(NewModule, OrigLoop, Args);
-?MORPHEUS_CB_HANDLE_OVERRIDE(locks_agent, NewModule, loop, OrigLoop, Args, _Ann) ->
+    apply(NewModule, NewEntry, Args);
+?MORPHEUS_CB_HANDLE_OVERRIDE(locks_agent, NewModule, loop, NewEntry, Args, _Ann) ->
     [State] = Args,
     ets:delete(test_state, self()),
     ets:insert(test_state, {self(), State}),
     ToReport = lists:sort(ets:match(test_state, '$1')),
     %% UGLY! ...
-    morpheus_sandbox:call_ctl(morpheus_sandbox:get_ctl(), undefined, {nodelay, {guest_report_state, ToReport}}),
+    morpheus_sandbox:call_ctl(morpheus_sandbox:get_ctl(), undefined, {nodelay, ?cci_guest_report_state(ToReport)}),
     %% io:format(user, "report state ~p~n", [ToReport]),
     %% forward to the original code
-    apply(NewModule, OrigLoop, Args).
+    apply(NewModule, NewEntry, Args).
 
 all_test_() ->
     {timeout, 120, ?_test( test_entry() )}.
